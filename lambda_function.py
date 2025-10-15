@@ -11,18 +11,19 @@ def lambda_handler(event, context):
     db_pass = os.getenv("DB_PASS")
     db_host = os.getenv("DB_HOST")
     db_name = os.getenv("DB_NAME")
-    s3_bucket = "mi-bucket-etl"
+    s3_bucket = "xideralaws-curso-project"
     
     # 1️⃣ Conexión a la base de datos
     engine = sqlalchemy.create_engine(f"mysql+pymysql://{db_user}:{db_pass}@{db_host}/{db_name}")
-    query = "SELECT * FROM clientes;"  # Ejemplo
+    query = "SELECT * FROM personas;"  # Ejemplo
     
     df = pd.read_sql(query, engine)
     
     # 2️⃣ Convertir a Parquet
-    file_name = f"clientes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
+    file_name = f"personas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
     local_path = f"/tmp/{file_name}"
     df.to_parquet(local_path, index=False)
+    
     
     # 3️⃣ Subir a S3
     s3 = boto3.client("s3")
