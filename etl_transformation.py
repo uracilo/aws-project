@@ -1,43 +1,50 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, count
-import json
 import boto3
+import json
+from datetime import datetime
 
-# Crear sesión Spark
+# 1️⃣ Inicializar Spark con compresión ZSTD
 spark = SparkSession.builder \
-    .appName("ETLClientes") \
+    .appName("ETL_Transformacion_Clientes") \
+    .config("spark.sql.parquet.compression.codec", "zstd") \
+    .config("spark.sql.parquet.filterPushdown", "true") \
+    .config("spark.sql.files.maxPartitionBytes", 134217728) \
     .getOrCreate()
 
-# Ruta del bucket S3
-s3_bucket = "s3://xideralaws-curso-project"
-raw_path = f"{s3_bucket}/raw_data/"
-data_path = f"{s3_bucket}/data/"
+# 2️⃣ Paths S3
+bucket = "xideralaws-curso-project"
+raw_path = f"s3://{bucket}/raw_data/"
+data_path = f"s3://{bucket}/data/"
 
-# 1️⃣ Leer datos en formato Parquet
+# 3️⃣ Leer todos los archivos Parquet del raw_data
 df = spark.read.parquet(raw_path)
 
-# 2️⃣ Calcular frecuencia de ciudades
+# 4️⃣ Calcular frecuencias
 freq_ciudades = df.groupBy("ciudad").count().orderBy(col("count").desc())
 freq_nombres = df.groupBy("nombre").count().orderBy(col("count").desc())
 
-# 3️⃣ Escribir datos procesados a S3/data en formato Parquet
-df.write.mode("overwrite").parquet(f"{data_path}/clientes_limpios.parquet")
+# 5️⃣ Escribir DataFrame limpio comprimido (ZSTD)
+df.write.mode("overwrite").option("compression", "zstd").parquet(f"{data_path}/clientes_limpios.parquet")
 
-# 4️⃣ Crear resumen en JSON
-top_ciudades = freq_ciudades.limit(5).toPandas().to_dict(orient="records")
-top_nombres = freq_nombres.limit(5).toPandas().to_dict(orient="records")
+# 6️⃣ Crear resumen en JSON
+top_ciudades = freq_ciudades.limit(10).toPandas().to_dict(orient="records")
+top_nombres = freq_nombres.limit(10).toPandas().to_dict(orient="records")
 
 summary = {
-    "fecha_procesamiento": "2025-10-15",
+    "fecha_procesamiento": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "total_registros": df.count(),
     "top_ciudades": top_ciudades,
     "top_nombres": top_nombres
 }
 
-# 5️⃣ Guardar JSON en S3
+# 7️⃣ Guardar JSON en S3
 s3 = boto3.client("s3")
 s3.put_object(
-    Bucket="mi-bucket-etl",
+    Bucket=bucket,
     Key="data/summary.json",
     Body=json.dumps(summary, indent=2),
     ContentType="application/json"
 )
+
+print("✅ Transformación completada y summary.json guardado en S3.")
