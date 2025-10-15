@@ -9,7 +9,7 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # Ruta del bucket S3
-s3_bucket = "s3://mi-bucket-etl"
+s3_bucket = "s3://xideralaws-curso-project"
 raw_path = f"{s3_bucket}/raw_data/"
 data_path = f"{s3_bucket}/data/"
 
